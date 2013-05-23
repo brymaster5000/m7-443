@@ -404,9 +404,8 @@ static int __init msm_cpufreq_register(void)
 		per_cpu(cpufreq_suspend, cpu).device_suspended = 0;
 	}
 
-#ifdef CONFIG_SMP
-	msm_cpufreq_wq = create_workqueue("msm-cpufreq");
-#endif
+	msm_cpufreq_wq = alloc_workqueue("msm-cpufreq", WQ_HIGHPRI, 0);
+	register_hotcpu_notifier(&msm_cpufreq_cpu_notifier);
 
 	register_pm_notifier(&msm_cpufreq_pm_notifier);
 	return cpufreq_register_driver(&msm_cpufreq_driver);
