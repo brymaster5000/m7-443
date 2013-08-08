@@ -115,41 +115,33 @@ static int set_cpu_freq(struct cpufreq_policy *policy, unsigned int new_freq,
 			unsigned int index)
 {
 	int ret = 0;
-	int perf_freq = 0;
+	int saved_sched_policy = -EINVAL;
+	int saved_sched_rt_prio = -EINVAL;
 	struct cpufreq_freqs freqs;
 	struct cpu_freq *limit = &per_cpu(cpu_freq_info, policy->cpu);
-
-	freqs.old = policy->cur;
-#ifdef CONFIG_PERFLOCK
-	perf_freq = perflock_override(policy, new_freq);
-	if (perf_freq) {
-		if (policy->cur == perf_freq)
-			return 0;
-		else
-			freqs.new = perf_freq;
-	} else if (override_cpu) {
-#else
-	if (override_cpu) {
-#endif
-		if (policy->cur == policy->max)
-			return 0;
-		else
-			freqs.new = policy->max;
-	} else
-		freqs.new = new_freq;
+	struct sched_param param = { .sched_priority = MAX_RT_PRIO-1 };
+	struct cpufreq_frequency_table *table;
 
 	if (limit->limits_init) {
-		if (freqs.new > limit->allowed_max) {
-			freqs.new = limit->allowed_max;
+		if (new_freq > limit->allowed_max) {
+			new_freq = limit->allowed_max;
 			pr_debug("max: limiting freq to %d\n", new_freq);
 		}
 
-		if (freqs.new < limit->allowed_min) {
-			freqs.new = limit->allowed_min;
+		if (new_freq < limit->allowed_min) {
+			new_freq = limit->allowed_min;
 			pr_debug("min: limiting freq to %d\n", new_freq);
 		}
 	}
 
+	/* limits applied above must be in cpufreq table */
+	table = cpufreq_frequency_get_table(policy->cpu);
+	if (cpufreq_frequency_table_target(policy, table, new_freq,
+		CPUFREQ_RELATION_H, &index))
+		return -EINVAL;
+
+	freqs.old = policy->cur;
+	freqs.new = new_freq;
 	freqs.cpu = policy->cpu;
 	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
 
@@ -171,7 +163,6 @@ static int set_cpu_freq(struct cpufreq_policy *policy, unsigned int new_freq,
 	return ret;
 }
 
-#ifdef CONFIG_SMP
 static void set_cpu_work(struct work_struct *work)
 {
 	struct cpufreq_work_struct *cpu_work =
@@ -181,7 +172,6 @@ static void set_cpu_work(struct work_struct *work)
 					cpu_work->index);
 	complete(&cpu_work->complete);
 }
-#endif
 
 static int msm_cpufreq_target(struct cpufreq_policy *policy,
 				unsigned int target_freq,
@@ -460,7 +450,7 @@ static struct freq_attr *msm_freq_attr[] = {
 };
 
 static struct cpufreq_driver msm_cpufreq_driver = {
-	
+	/* lps calculations are handled here. */
 	.flags		= CPUFREQ_STICKY | CPUFREQ_CONST_LOOPS,
 	.init		= msm_cpufreq_init,
 	.verify		= msm_cpufreq_verify,
