@@ -1948,6 +1948,13 @@ config GPU_OVERCLOCK
 	help
 	  Krait 600 GPU overclocking 
 
+config GPU_OVERCLOCK_450
+	bool "Enable special GPU Overclocking option"
+	depends on GPU_OVERCLOCK
+	default n
+	help
+	  APQ8064 GPU overclocking to 450
+
 config MSM_CPU_AVS
 	bool "Enable software controlled Adaptive Voltage Scaling (AVS)"
 	depends on (ARCH_MSM_SCORPION && QSD_SVS)
