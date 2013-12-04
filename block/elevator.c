@@ -714,6 +714,12 @@ void elv_completed_request(struct request_queue *q, struct request *rq)
 {
 	struct elevator_queue *e = q->elevator;
 
+	if (test_bit(REQ_ATOM_URGENT, &rq->atomic_flags)) {
+	  q->notified_urgent = false;
+	  q->dispatched_urgent = false;
+	  blk_clear_rq_urgent(rq);
+	}
+
 	if (blk_account_rq(rq)) {
 		q->in_flight[rq_is_sync(rq)]--;
 		if ((rq->cmd_flags & REQ_SORTED) &&
