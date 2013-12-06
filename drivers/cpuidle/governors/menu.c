@@ -138,24 +138,6 @@ static enum hrtimer_restart menu_hrtimer_notify(struct hrtimer *hrtimer)
 	return HRTIMER_NORESTART;
 }
 
-static void detect_repeating_patterns(struct menu_device *data)
-{
-	int i;
-	uint64_t avg = 0;
-	uint64_t stddev = 0; 
-
-	
-	for (i = 0; i < INTERVALS; i++)
-		avg += data->intervals[i];
-	avg = avg / INTERVALS;
-
-	
-	if (avg > data->expected_us)
-		return 0;
-
-	for (i = 0; i < INTERVALS; i++)
-		stddev += (data->intervals[i] - avg) *
-			  (data->intervals[i] - avg);
 /*
  * Try detecting repeating patterns by keeping track of the last 8
  * intervals, and checking if the standard deviation of that set
