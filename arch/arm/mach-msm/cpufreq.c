@@ -143,6 +143,18 @@ static int set_cpu_freq(struct cpufreq_policy *policy, unsigned int new_freq,
 	freqs.old = policy->cur;
 	freqs.new = new_freq;
 	freqs.cpu = policy->cpu;
+
+	/*
+	 * Put the caller into SCHED_FIFO priority to avoid cpu starvation
+	 * in the acpuclk_set_rate path while increasing frequencies
+	 */
+
+	if (freqs.new > freqs.old && current->policy != SCHED_FIFO) {
+		saved_sched_policy = current->policy;
+		saved_sched_rt_prio = current->rt_priority;
+		sched_setscheduler_nocheck(current, SCHED_FIFO, &param);
+	}
+
 	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
 
 	if (is_clk) {
@@ -160,6 +172,11 @@ static int set_cpu_freq(struct cpufreq_policy *policy, unsigned int new_freq,
 	if (!ret)
 		cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
 
+	/* Restore priority after clock ramp-up */
+	if (freqs.new > freqs.old && saved_sched_policy >= 0) {
+		param.sched_priority = saved_sched_rt_prio;
+		sched_setscheduler_nocheck(current, saved_sched_policy, &param);
+	}
 	return ret;
 }
 
@@ -367,6 +384,7 @@ static int __cpuinit msm_cpufreq_init(struct cpufreq_policy *policy)
 
 	policy->cpuinfo.transition_latency =
 		acpuclk_get_switch_time() * NSEC_PER_USEC;
+
 	cpu_work = &per_cpu(cpufreq_work, policy->cpu);
 	INIT_WORK(&cpu_work->work, set_cpu_work);
 	init_completion(&cpu_work->complete);
@@ -415,10 +433,31 @@ static int __cpuinit msm_cpufreq_cpu_callback(struct notifier_block *nfb,
 		break;
 	}
 
-	return NOTIFY_DONE;
+	return NOTIFY_OK;
 }
 
-static int msm_cpufreq_resume(void)
+static struct notifier_block __refdata msm_cpufreq_cpu_notifier = {
+	.notifier_call = msm_cpufreq_cpu_callback,
+};
+
+/*
+ * Define suspend/resume for cpufreq_driver. Kernel will call
+ * these during suspend/resume with interrupts disabled. This
+ * helps the suspend/resume variable get's updated before cpufreq
+ * governor tries to change the frequency after coming out of suspend.
+ */
+static int msm_cpufreq_suspend(struct cpufreq_policy *policy)
+{
+	int cpu;
+
+	for_each_possible_cpu(cpu) {
+		per_cpu(cpufreq_suspend, cpu).device_suspended = 1;
+	}
+
+	return 0;
+}
+
+static int msm_cpufreq_resume(struct cpufreq_policy *policy)
 {
 	int cpu;
 
@@ -426,22 +465,7 @@ static int msm_cpufreq_resume(void)
 		per_cpu(cpufreq_suspend, cpu).device_suspended = 0;
 	}
 
-	return NOTIFY_DONE;
-}
-
-static int msm_cpufreq_pm_event(struct notifier_block *this,
-				unsigned long event, void *ptr)
-{
-	switch (event) {
-	case PM_POST_HIBERNATION:
-	case PM_POST_SUSPEND:
-		return msm_cpufreq_resume();
-	case PM_HIBERNATION_PREPARE:
-	case PM_SUSPEND_PREPARE:
-		return msm_cpufreq_suspend();
-	default:
-		return NOTIFY_DONE;
-	}
+	return 0;
 }
 
 static struct freq_attr *msm_freq_attr[] = {
@@ -456,6 +480,8 @@ static struct cpufreq_driver msm_cpufreq_driver = {
 	.verify		= msm_cpufreq_verify,
 	.target		= msm_cpufreq_target,
 	.get		= msm_cpufreq_get_freq,
+	.suspend	= msm_cpufreq_suspend,
+	.resume		= msm_cpufreq_resume,
 	.name		= "msm",
 	.attr		= msm_freq_attr,
 };
@@ -644,7 +670,6 @@ static struct platform_driver msm_cpufreq_plat_driver = {
 		.of_match_table = match_table,
 		.owner = THIS_MODULE,
 	},
->>>>>>> 7cb3cca... msm: cpufreq: Add support for CPU clocks and msm-cpufreq device
 };
 
 static int __init msm_cpufreq_register(void)
@@ -659,11 +684,6 @@ static int __init msm_cpufreq_register(void)
 	platform_driver_probe(&msm_cpufreq_plat_driver, msm_cpufreq_probe);
 	msm_cpufreq_wq = alloc_workqueue("msm-cpufreq", WQ_HIGHPRI, 0);
 	register_hotcpu_notifier(&msm_cpufreq_cpu_notifier);
-<<<<<<< HEAD
-
-	register_pm_notifier(&msm_cpufreq_pm_notifier);
-=======
->>>>>>> 7cb3cca... msm: cpufreq: Add support for CPU clocks and msm-cpufreq device
 	return cpufreq_register_driver(&msm_cpufreq_driver);
 }
 
