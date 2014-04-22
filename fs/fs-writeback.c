@@ -42,7 +42,6 @@ struct wb_writeback_work {
 	unsigned int for_background:1;
 	unsigned int for_sync:1;
 	enum wb_reason reason;		
-	unsigned int for_sync:1;	/* sync(2) WB_SYNC_ALL writeback */
 
 	struct list_head list;		
 	struct completion *done;	
