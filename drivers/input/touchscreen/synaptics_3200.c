@@ -258,31 +258,38 @@ extern void sweep2wake_setdev(struct input_dev * input_device) {
 EXPORT_SYMBOL(sweep2wake_setdev);
 
 static void sweep2wake_presspwr(struct work_struct * sweep2wake_presspwr_work) {
-	int pocket_mode = 0;
 
-	if (scr_suspended == true && pocket_detect == 1)
-		pocket_mode = pocket_detection_check();
+	if (scr_suspended == true && pocket_detect == 1) {
+		if (pocket_detection_check()) {
+	        	if (wake_lock_active(&l2w_wakelock))
+				wake_unlock(&l2w_wakelock);
+			return;
+		}
+	}
 
 	if (l2w_switch == 1)
 		break_longtap_count = 1;
 
-	if (!pocket_mode || pocket_detect == 0) {
-		if (!mutex_trylock(&pwrkeyworklock))
-        	        return;
-		input_event(sweep2wake_pwrdev, EV_KEY, KEY_POWER, 1);
-		input_event(sweep2wake_pwrdev, EV_SYN, 0, 0);
-		msleep(60);
-		input_event(sweep2wake_pwrdev, EV_KEY, KEY_POWER, 0);
-		input_event(sweep2wake_pwrdev, EV_SYN, 0, 0);
-		msleep(60);
-        	mutex_unlock(&pwrkeyworklock);
-
-		if (wakesleep_vib) {
-		        vibrate(vib_strength);
-			wakesleep_vib = 0;
-		}
-		return;
+	if (wakesleep_vib) {
+	        vibrate(vib_strength);
+		wakesleep_vib = 0;
 	}
+
+	if (!mutex_trylock(&pwrkeyworklock))
+		return;
+	input_event(sweep2wake_pwrdev, EV_KEY, KEY_POWER, 1);
+	input_event(sweep2wake_pwrdev, EV_SYN, 0, 0);
+	msleep(60);
+	input_event(sweep2wake_pwrdev, EV_KEY, KEY_POWER, 0);
+	input_event(sweep2wake_pwrdev, EV_SYN, 0, 0);
+	msleep(60);
+       	mutex_unlock(&pwrkeyworklock);
+
+	if (wake_lock_active(&l2w_wakelock))
+		wake_unlock(&l2w_wakelock);
+
+	return;
+>>>>>>> 399e5fd... S2W/L2W/DT2W: Make vibration more immediate when activated
 }
 static DECLARE_WORK(sweep2wake_presspwr_work, sweep2wake_presspwr);
 
