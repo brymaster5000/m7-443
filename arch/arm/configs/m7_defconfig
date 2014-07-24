@@ -1082,7 +1082,7 @@ CONFIG_BT=y
 # CONFIG_BT_RFCOMM is not set
 # CONFIG_BT_BNEP is not set
 CONFIG_BT_HIDP=y
-# CONFIG_BT_WBS_BRCM is not set
+CONFIG_BT_WBS_BRCM=y
 
 #
 # Bluetooth device drivers
