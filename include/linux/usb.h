@@ -192,7 +192,7 @@ struct usb_bus {
 	struct mon_bus *mon_bus;	
 	int monitored;			
 #endif
-	unsigned skip_resume:1;		/* All USB devices are brought into full
+	unsigned skip_resume:1;		/* All USB devices are brought into full*/
 };
 
 

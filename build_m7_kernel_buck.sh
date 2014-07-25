@@ -27,7 +27,7 @@
   m=$k/out/$c/system/lib/modules
   z=$c-$today
 
-TOOLCHAIN=/home/forrest/android/arm-eabi-4.7/bin/arm-eabi-
+TOOLCHAIN=/home/forrest/kernel/linaro-4.9.1/bin/arm-cortex_a15-linux-gnueabihf-
 export ARCH=arm
 export SUBARCH=arm
 
