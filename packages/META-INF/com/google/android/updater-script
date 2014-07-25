@@ -1,7 +1,7 @@
 ui_print("");
 ui_print("");
 
-ui_print("Welcome To Lunar kernel");
+ui_print("Flashing Elite-Lunar Kernel");
 ui_print("By Buckmarble and Brymaster5000");
 ui_print("");
 ui_print("");
@@ -15,7 +15,6 @@ ui_print("Cleaning up");
 delete("/system/etc/init.d/99elementalx");
 delete("/system/etc/init.d/03elite");
 delete("/system/etc/init.d/99Lunar");
-delete("/system/bin/pnpmgr");
 ui_print("");
 ui_print("Installing system files");
 package_extract_dir("system", "/system");
