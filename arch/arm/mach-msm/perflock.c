@@ -390,12 +390,12 @@ static void do_set_rate_fn(struct work_struct *work)
 {
 	struct cpufreq_freqs freqs;
 	int ret = 0;
-/*#ifdef CONFIG_CPU_FREQ_GOV_ONDEMAND
+#ifdef CONFIG_CPU_FREQ_GOV_ONDEMAND
 	if(is_governor_ondemand() && is_ondemand_locked()) {
 		pr_info("[K] perflock ignore setrate, ondemand governor locked\n");
 		return;
 	}
-#endif*/
+#endif
 	freqs.new = perflock_override(NULL, 0);
 	freqs.cpu = smp_processor_id();
 	cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
