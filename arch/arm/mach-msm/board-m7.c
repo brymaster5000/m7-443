@@ -240,6 +240,9 @@ enum {
 #ifdef CONFIG_CPU_FREQ_GOV_ONDEMAND_2_PHASE
 int set_two_phase_freq(int cpufreq);
 #endif
+#ifdef CONFIG_CPU_FREQ_GOV_INTELLIDEMAND 
+int id_set_two_phase_freq(int cpufreq);
+#endif
 
 int set_input_event_min_freq_by_cpu(int cpu_nr, int cpufreq);
 
@@ -4122,14 +4125,27 @@ static struct platform_device msm_tsens_device = {
 
 static struct msm_thermal_data msm_thermal_pdata = {
 	.sensor_id = 0,
-/*	.poll_ms = 1000,
+#ifdef CONFIG_INTELLI_THERMAL
+        .poll_ms = 250,
 #ifdef CONFIG_CPU_OVERCLOCK
-	.limit_temp = 75,
+        .limit_temp_degC = 70,
 #else
-	.limit_temp = 51,
+        .limit_temp_degC = 60,
+#endif
+        .temp_hysteresis_degC = 10,
+        .freq_step = 2,
+        .freq_control_mask = 0xf,
+        .core_limit_temp_degC = 80,
+/*#else
+	.poll_ms = 1000,*/
+#ifdef CONFIG_CPU_OVERCLOCK
+	.limit_temp = 70,
+#else
+	.limit_temp = 60,
 #endif
 	.temp_hysteresis = 10,
-	.limit_freq = 918000,*/
+	.limit_freq = 918000,
+#endif
 };
 
 static int __init check_dq_setup(char *str)
