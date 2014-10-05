@@ -253,15 +253,6 @@ static DEFINE_MUTEX(longtap_count_lock);
 
 static void report_gesture(int gest)
 {
-        pwrtrigger_time[1] = pwrtrigger_time[0];
-        pwrtrigger_time[0] = jiffies;	
-
-	if (pwrtrigger_time[0] - pwrtrigger_time[1] < S2W_TIMEOUT3) {
-		if (wake_lock_active(&l2w_wakelock))
-			wake_unlock(&l2w_wakelock);
-		return;
-	}
-
 	if ((pocket_detect && !pocket_detection_check()) || !pocket_detect) {
 		input_report_rel(gesture_dev, WAKE_GESTURE, gest);
 		input_sync(gesture_dev);
@@ -2693,7 +2684,11 @@ static void sweep2wake_func(int button_id) {
         s2w_time[1] = s2w_time[0];
         s2w_time[0] = jiffies;
 
-	s2w_hist[1] = s2w_hist[0];
+	if (scr_suspended && s2w_hist[0] == 2)
+		s2w_hist[1] = 0;
+	else	
+		s2w_hist[1] = s2w_hist[0];
+        
 	s2w_hist[0] = button_id;
 
 	if ((s2w_time[0]-s2w_time[2]) < S2W_TIMEOUT2 && !scr_suspended) {
@@ -2713,14 +2708,10 @@ static void sweep2wake_func(int button_id) {
 				sweep2wake_pwrtrigger();
 			}
 
-		} else if (s2w_hist[1] == 2 && s2w_hist[0] == 1) {
+		} else if ((s2w_hist[1] == 2 && s2w_hist[0] == 1) && !scr_suspended) {
+	        	pr_debug("[S2W]: ON->OFF\n");
 			reset_sweep2wake();
-			if (gestures_switch && scr_suspended) {
-				report_gesture(2);
-			} else if (!scr_suspended) {
-		        	pr_debug("[S2W]: ON->OFF\n");
-				sweep2wake_pwrtrigger();
-			}
+			sweep2wake_pwrtrigger();
 		} else {
 			reset_sweep2wake();
 			return;
@@ -2979,7 +2970,7 @@ static void synaptics_ts_finger_func(struct synaptics_ts_data *ts)
 		}
 	}
 
-        if (l2m_switch || l2w_switch || gestures_switch) { 
+        if (l2m_switch == 1 || l2w_switch == 1) { 
 
 		// released (supposedly before long tap happened), break long tap count work...
 		break_longtap_count = 1;
