@@ -147,6 +147,7 @@ config ARCH_MSM8960
 	select ARM_HAS_SG_CHAIN
 	select MSM_KRAIT_WFE_FIXUP
 	select MSM_IOMMU_GPU_SYNC
+	select HAS_MACH_MEMUTILS	
 
 config ARCH_MSM8930
 	bool "MSM8930"
@@ -3276,10 +3277,16 @@ config FORCE_FAST_CHARGE
 	  A simple sysfs interface to force adapters that
 	  are detected as USB to charge as AC.
 
-endif
+config HAS_MACH_MEMUTILS
+	default y
+	bool "Motorola MSM memcpy enhancements"
+	help
+	Faster memcpy performance for Krait
 
 config MSM_SLEEPER
     bool "Limit max frequency while screen is off"
     default y
     help
       Limit max frequency while screen is off
+
+endif
