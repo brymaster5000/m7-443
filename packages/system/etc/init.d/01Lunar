@@ -24,3 +24,8 @@ echo 400000000 > /sys/devices/platform/kgsl-3d0.0/kgsl/kgsl-3d0/gpuclk;
 echo 0 > /sys/devices/system/cpu/cpufreq/ondemand/gboost;
 echo 1 > /sys/devices/system/cpu/cpufreq/ondemand/enable_boost_cpu;
 
+#Set Slim governer tunables
+echo 90 > /sys/devices/system/cpu/cpufreq/slim/up_threshold
+echo 80 > /sys/devices/system/cpu/cpufreq/slim/up_threshold_multi_core
+echo 80 > /sys/devices/system/cpu/cpufreq/slim/up_threshold_any_cpu_load
+echo 0 > /sys/devices/system/cpu/cpufreq/slim/gboost
