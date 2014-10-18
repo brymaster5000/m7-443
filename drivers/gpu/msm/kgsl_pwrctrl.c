@@ -36,7 +36,11 @@
 
 extern void set_gpu_clk(unsigned int);
 
+#ifdef CONFIG_CPU_FREQ_GOV_SLIM
+int graphics_boost = 6;
+#else
 int graphics_boost = 2;
+#endif
 
 struct clk_pair {
 	const char *name;
