@@ -269,6 +269,7 @@ static void tick_nohz_stop_sched_tick(struct tick_sched *ts)
 		if (rcu_delta_jiffies < delta_jiffies) {
 			next_jiffies = last_jiffies + rcu_delta_jiffies;
 			delta_jiffies = rcu_delta_jiffies;
+		}
 	}
 	if (!ts->tick_stopped && delta_jiffies == 1)
 		goto out;
