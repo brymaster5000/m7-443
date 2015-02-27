@@ -25,12 +25,15 @@
 
 #include "board-m7.h"
 
+//BCM4335_WiFiBTCOEX++
 #include <linux/miscdevice.h>
 #include <asm/uaccess.h>
 
+/* Broadcom BT/Wi-Fi on/off lock */
 #define BTLOCK_NAME     "btlock"
-#define BTLOCK_MINOR    MISC_DYNAMIC_MINOR 
+#define BTLOCK_MINOR    MISC_DYNAMIC_MINOR //224
 
+/* BT lock waiting timeout, in second */
 #define BTLOCK_TIMEOUT	2
 
 #define PR(msg, ...) printk("####"msg, ##__VA_ARGS__)
@@ -147,12 +150,14 @@ static void bcm_btlock_exit(void)
 
 	misc_deregister(&btlock_misc);
 }
+//BCM4335_WiFiBTCOEX--
 
 static struct rfkill *bt_rfk;
 static const char bt_name[] = "bcm4334";
 
 extern unsigned int system_rev;
 
+/* Add PMIC define for control 8921 start*/
 struct pm8xxx_gpio_init {
 	unsigned			gpio;
 	struct pm_gpio			config;
@@ -190,28 +195,30 @@ struct pm8xxx_gpio_init m7_bt_pmic_gpio[] = {
 				PM_GPIO_FUNC_NORMAL, 0, 0),
 };
 
+/* Add PMIC define for control 8921 end */
 
+/* bt on configuration */
 static uint32_t m7_GPIO_bt_on_table[] = {
 
-	
+	/* BT_RTS */
 	GPIO_CFG(BT_UART_RTSz,
 				2,
 				GPIO_CFG_OUTPUT,
 				GPIO_CFG_NO_PULL,
 				GPIO_CFG_4MA),
-	
+	/* BT_CTS */
 	GPIO_CFG(BT_UART_CTSz,
 				2,
 				GPIO_CFG_INPUT,
 				GPIO_CFG_PULL_UP,
 				GPIO_CFG_4MA),
-	
+	/* BT_RX */
 	GPIO_CFG(BT_UART_RX,
 				2,
 				GPIO_CFG_INPUT,
 				GPIO_CFG_PULL_UP,
 				GPIO_CFG_4MA),
-	
+	/* BT_TX */
 	GPIO_CFG(BT_UART_TX,
 				2,
 				GPIO_CFG_OUTPUT,
@@ -219,27 +226,28 @@ static uint32_t m7_GPIO_bt_on_table[] = {
 				GPIO_CFG_4MA),
 };
 
+/* bt off configuration */
 static uint32_t m7_GPIO_bt_off_table[] = {
 
-	
+	/* BT_RTS */
 	GPIO_CFG(BT_UART_RTSz,
 				0,
 				GPIO_CFG_INPUT,
 				GPIO_CFG_PULL_DOWN,
 				GPIO_CFG_4MA),
-	
+	/* BT_CTS */
 	GPIO_CFG(BT_UART_CTSz,
 				0,
 				GPIO_CFG_INPUT,
 				GPIO_CFG_PULL_DOWN,
 				GPIO_CFG_4MA),
-	
+	/* BT_RX */
 	GPIO_CFG(BT_UART_RX,
 				0,
 				GPIO_CFG_INPUT,
 				GPIO_CFG_PULL_DOWN,
 				GPIO_CFG_4MA),
-	
+	/* BT_TX */
 	GPIO_CFG(BT_UART_TX,
 				0,
 				GPIO_CFG_INPUT,
@@ -264,28 +272,28 @@ static void m7_GPIO_config_bt_on(void)
 {
 	printk(KERN_INFO "[BT]== R ON ==\n");
 
-	
+	/* set bt on configuration*/
 	config_bt_table(m7_GPIO_bt_on_table,
 				ARRAY_SIZE(m7_GPIO_bt_on_table));
 	mdelay(2);
 
 	if (system_rev < XC) {
 		printk(KERN_INFO "[BT]XA XB\n");
-		
+		//workaround for raise wl_reg_on to load config file
 		htc_BCM4335_wl_reg_ctl(BCM4335_WL_REG_ON, ID_BT);
-		
+		//gpio_set_value(PM8921_GPIO_PM_TO_SYS(WL_REG_ON), 1);
 		mdelay(5);
 	}
 
-	
+	/* BT_REG_ON */
 	gpio_set_value(PM8921_GPIO_PM_TO_SYS(BT_REG_ON), 0);
 	mdelay(5);
 
-	
-	gpio_set_value(PM8921_GPIO_PM_TO_SYS(BT_WAKE), 0); 
+	/* BT_WAKE and HOST_WAKE */
+	gpio_set_value(PM8921_GPIO_PM_TO_SYS(BT_WAKE), 0); //BT wake
 
 	mdelay(5);
-	
+	/* BT_REG_ON */
 	gpio_set_value(PM8921_GPIO_PM_TO_SYS(BT_REG_ON), 1);
 
 	mdelay(1);
@@ -295,35 +303,35 @@ static void m7_GPIO_config_bt_on(void)
 static void m7_GPIO_config_bt_off(void)
 {
 	if (system_rev < XC) {
-		
+		//workaround for raise wl_reg_on to load config file
 		htc_BCM4335_wl_reg_ctl(BCM4335_WL_REG_OFF, ID_BT);
 		mdelay(5);
 	}
 
-	
+	/* BT_REG_ON */
 	gpio_set_value(PM8921_GPIO_PM_TO_SYS(BT_REG_ON), 0);
 	mdelay(1);
 
-	
+	/* set bt off configuration*/
 	config_bt_table(m7_GPIO_bt_off_table,
 				ARRAY_SIZE(m7_GPIO_bt_off_table));
 	mdelay(2);
 
-	
-	
+	/* BT_RTS */
+	//gpio_set_value(BT_UART_RTSz, 1);
 
-	
+	/* BT_CTS */
 
-	
-	
+	/* BT_TX */
+	//gpio_set_value(BT_UART_TX, 1);
 
-	
+	/* BT_RX */
 
 
-	
+	/* BT_HOST_WAKE */
 
-	
-	gpio_set_value(PM8921_GPIO_PM_TO_SYS(BT_WAKE), 0); 
+	/* BT_CHIP_WAKE */
+	gpio_set_value(PM8921_GPIO_PM_TO_SYS(BT_WAKE), 0); //BT wake
 
 	printk(KERN_INFO "[BT]== R OFF ==\n");
 }
@@ -345,11 +353,11 @@ static struct rfkill_ops m7_rfkill_ops = {
 static int m7_rfkill_probe(struct platform_device *pdev)
 {
 	int rc = 0;
-	bool default_state = true;  
+	bool default_state = true;  /* off */
 	int i=0;
 
-	
-	
+	/* always turn on clock? */
+	/* htc_wifi_bt_sleep_clk_ctl(CLK_ON, ID_BT); */
 	mdelay(2);
 
 	for( i = 0; i < ARRAY_SIZE(m7_bt_pmic_gpio); i++) {
@@ -360,7 +368,9 @@ static int m7_rfkill_probe(struct platform_device *pdev)
 				__func__, m7_bt_pmic_gpio[i].gpio, rc);
 	}
 
+//BCM4335_WiFiBTCOEX++
 	bcm_btlock_init();
+//BCM4335_WiFiBTCOEX--
 
 	bluetooth_set_power(NULL, default_state);
 
@@ -373,7 +383,7 @@ static int m7_rfkill_probe(struct platform_device *pdev)
 
 	rfkill_set_states(bt_rfk, default_state, false);
 
-	
+	/* userspace cannot take exclusive control */
 
 	rc = rfkill_register(bt_rfk);
 	if (rc)
@@ -392,7 +402,9 @@ static int m7_rfkill_remove(struct platform_device *dev)
 	rfkill_unregister(bt_rfk);
 	rfkill_destroy(bt_rfk);
 
+//BCM4335_WiFiBTCOEX++
 	bcm_btlock_exit();
+//BCM4335_WiFiBTCOEX--
 
 	return 0;
 }

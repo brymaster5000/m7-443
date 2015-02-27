@@ -45,7 +45,7 @@ static struct msm_dcvs_core_info grp3d_core_info = {
                .ss_iobusy_conv = 100,
        },
 };
-#endif 
+#endif /* CONFIG_MSM_DCVS */
 
 #ifdef CONFIG_MSM_BUS_SCALING
 static struct msm_bus_vectors grp3d_init_vectors[] = {
@@ -156,7 +156,7 @@ static struct msm_bus_scale_pdata grp3d_bus_scale_pdata = {
 static struct resource kgsl_3d0_resources[] = {
 	{
 		.name = KGSL_3D0_REG_MEMORY,
-		.start = 0x04300000, 
+		.start = 0x04300000, /* GFX3D address */
 		.end = 0x0431ffff,
 		.flags = IORESOURCE_MEM,
 	},
