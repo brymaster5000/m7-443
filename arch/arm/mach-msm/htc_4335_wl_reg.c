@@ -14,6 +14,7 @@
  *
  */
 
+/* Control bluetooth power for glacier platform */
 
 #include <linux/gpio.h>
 #include <linux/mfd/pm8xxx/pm8921.h>

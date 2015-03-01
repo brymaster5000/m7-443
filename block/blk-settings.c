@@ -60,7 +60,7 @@ EXPORT_SYMBOL_GPL(blk_queue_lld_busy);
 
 void blk_urgent_request(struct request_queue *q, request_fn_proc *fn)
 {
-  q->urgent_request_fn = fn;
+	q->urgent_request_fn = fn;
 }
 EXPORT_SYMBOL(blk_urgent_request);
 

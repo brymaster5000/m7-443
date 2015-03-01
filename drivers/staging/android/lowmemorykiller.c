@@ -40,6 +40,7 @@
 #include <linux/mutex.h>
 #include <linux/delay.h>
 #include <linux/swap.h>
+#include <linux/fs.h>
 
 #ifdef CONFIG_ZRAM_FOR_ANDROID
 #include <linux/fs.h>
@@ -233,8 +234,15 @@ static int lowmem_shrink(struct shrinker *s, struct shrink_control *sc)
 	}
 
 	other_free = global_page_state(NR_FREE_PAGES);
-	other_file = global_page_state(NR_FILE_PAGES) -
-		global_page_state(NR_SHMEM) - global_page_state(NR_MLOCK) ;
+
+	if (global_page_state(NR_SHMEM) + global_page_state(NR_MLOCK) + total_swapcache_pages <
+		global_page_state(NR_FILE_PAGES))
+		other_file = global_page_state(NR_FILE_PAGES) -
+						global_page_state(NR_SHMEM) -
+						global_page_state(NR_MLOCK) -
+						total_swapcache_pages;
+	else
+		other_file = 0;
 
 #ifdef CONFIG_ZRAM_FOR_ANDROID
 	other_file -= total_swapcache_pages;

@@ -833,6 +833,7 @@ int dying_processors_read_proc(char *page, char **start, off_t off,
 	return p - page;
 }
 
+static int sigkill_pending(struct task_struct *tsk);
 static int send_signal(int sig, struct siginfo *info, struct task_struct *t,
 			int group)
 {
@@ -841,7 +842,7 @@ static int send_signal(int sig, struct siginfo *info, struct task_struct *t,
 	send_signal_debug_dump(sig, t);
 #endif
 
-	if (sig == SIGKILL) {
+	if (sig == SIGKILL && !sigkill_pending(t)) {
 		dying_pid_buf[dying_pid_buf_idx].pid = t->pid;
 		dying_pid_buf[dying_pid_buf_idx].jiffy = jiffies;
 

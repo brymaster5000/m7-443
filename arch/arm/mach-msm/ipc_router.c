@@ -9,7 +9,7 @@
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
-#if defined(CONFIG_MACH_M7_WLV)
+#if defined(CONFIG_MACH_DUMMY)
 
 #define DEBUG
 

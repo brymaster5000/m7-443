@@ -126,7 +126,7 @@ update_all_cpus_max_freq_if_changed(int new_throttled_bin, unsigned temp)
 
 	throttled_bin = new_throttled_bin;
 
-	
+	/* Update new limits */
 	for_each_possible_cpu(cpu) {
 		ret = update_cpu_max_freq(cpu, throttled_bin, temp);
 		if (ret)
