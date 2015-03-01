@@ -308,8 +308,6 @@ void store_cpu_topology(unsigned int cpuid)
 	 */
 	default_cpu_topology_mask(cpuid);
 	/* update core and thread sibling masks */
-	for_each_possible_cpu(cpu) {
-		struct cputopo_arm *cpu_topo = &cpu_topology[cpu];
 
 
 	printk(KERN_INFO "CPU%u: thread %d, cpu %d, socket %d, mpidr %x\n",

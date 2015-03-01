@@ -210,69 +210,10 @@ struct zs_pool {
 	const char *name;
 };
 
-#define ZS_ALIGN		8
-
-#define ZS_MAX_ZSPAGE_ORDER 2
-#define ZS_MAX_PAGES_PER_ZSPAGE (_AC(1, UL) << ZS_MAX_ZSPAGE_ORDER)
-
-
-#ifndef MAX_PHYSMEM_BITS
-#ifdef CONFIG_HIGHMEM64G
-#define MAX_PHYSMEM_BITS 36
-#else 
-#define MAX_PHYSMEM_BITS BITS_PER_LONG
-#endif
-#endif
-#define _PFN_BITS		(MAX_PHYSMEM_BITS - PAGE_SHIFT)
-#define OBJ_INDEX_BITS	(BITS_PER_LONG - _PFN_BITS)
-#define OBJ_INDEX_MASK	((_AC(1, UL) << OBJ_INDEX_BITS) - 1)
-
-#define MAX(a, b) ((a) >= (b) ? (a) : (b))
-#define ZS_MIN_ALLOC_SIZE \
-	MAX(32, (ZS_MAX_PAGES_PER_ZSPAGE << PAGE_SHIFT >> OBJ_INDEX_BITS))
-#define ZS_MAX_ALLOC_SIZE	PAGE_SIZE
-
-#define ZS_SIZE_CLASS_DELTA	(PAGE_SIZE >> 8)
-#define ZS_SIZE_CLASSES		((ZS_MAX_ALLOC_SIZE - ZS_MIN_ALLOC_SIZE) / \
-					ZS_SIZE_CLASS_DELTA + 1)
-
-enum fullness_group {
-	ZS_ALMOST_FULL,
-	ZS_ALMOST_EMPTY,
-	_ZS_NR_FULLNESS_GROUPS,
-
-	ZS_EMPTY,
-	ZS_FULL
-};
-
-static const int fullness_threshold_frac = 4;
-
-struct size_class {
-	int size;
-	unsigned int index;
-
-	
-	int pages_per_zspage;
-
-	spinlock_t lock;
-
-	
-	u64 pages_allocated;
-
-	struct page *fullness_list[_ZS_NR_FULLNESS_GROUPS];
-};
-
-struct link_free {
-	
-	void *next;
-};
-
-struct zs_pool {
-	struct size_class size_class[ZS_SIZE_CLASSES];
-
-	gfp_t flags;	
-};
-
+/*
+ * A zspage's class index and fullness group
+ * are encoded in its (first)page->mapping
+ */
 #define CLASS_IDX_BITS	28
 #define FULLNESS_BITS	4
 #define CLASS_IDX_MASK	((1 << CLASS_IDX_BITS) - 1)
@@ -443,7 +384,7 @@ out:
 static int get_pages_per_zspage(int class_size)
 {
 	int i, max_usedpc = 0;
-	
+	/* zspage order which gives maximum used size per KB */
 	int max_usedpc_order = 1;
 
 	for (i = 1; i <= ZS_MAX_PAGES_PER_ZSPAGE; i++) {
@@ -463,6 +404,11 @@ static int get_pages_per_zspage(int class_size)
 	return max_usedpc_order;
 }
 
+/*
+ * A single 'zspage' is composed of many system pages which are
+ * linked together using fields in struct page. This function finds
+ * the first/head page, given any component page of a zspage.
+ */
 static struct page *get_first_page(struct page *page)
 {
 	if (is_first_page(page))
@@ -478,13 +424,14 @@ static struct page *get_next_page(struct page *page)
 	if (is_last_page(page))
 		next = NULL;
 	else if (is_first_page(page))
-		next = (struct page *)page_private(page);
+		next = (struct page *)page->private;
 	else
 		next = list_entry(page->lru.next, struct page, lru);
 
 	return next;
 }
 
+/* Encode <page, obj_idx> as a single handle value */
 static void *obj_location_to_handle(struct page *page, unsigned long obj_idx)
 {
 	unsigned long handle;
@@ -495,7 +442,7 @@ static void *obj_location_to_handle(struct page *page, unsigned long obj_idx)
 	}
 
 	handle = page_to_pfn(page) << OBJ_INDEX_BITS;
-	handle |= ((obj_idx + 1) & OBJ_INDEX_MASK);
+	handle |= (obj_idx & OBJ_INDEX_MASK);
 
 	return (void *)handle;
 }
@@ -541,7 +488,7 @@ static void free_zspage(struct page *first_page)
 	reset_page(first_page);
 	__free_page(first_page);
 
-	
+	/* zspage with only 1 system page */
 	if (!head_extra)
 		return;
 
@@ -554,6 +501,7 @@ static void free_zspage(struct page *first_page)
 	__free_page(head_extra);
 }
 
+/* Initialize a newly allocated zspage */
 static void init_zspage(struct page *first_page, struct size_class *class)
 {
 	unsigned long off = 0;
@@ -565,6 +513,12 @@ static void init_zspage(struct page *first_page, struct size_class *class)
 		struct link_free *link;
 		unsigned int i, objs_on_page;
 
+		/*
+		 * page->index stores offset of first object starting
+		 * in the page. For the first page, this is always 0,
+		 * so we use first_page->index (aka ->freelist) to store
+		 * head of corresponding zspage's freelist.
+		 */
 		if (page != first_page)
 			page->index = off;
 
@@ -580,6 +534,11 @@ static void init_zspage(struct page *first_page, struct size_class *class)
 			}
 		}
 
+		/*
+		 * We now come to the last (full or partial) object on this
+		 * page, which must point to the first object on the next
+		 * page (if present)
+		 */
 		next_page = get_next_page(page);
 		link->next = obj_location_to_handle(next_page, 0);
 		kunmap_atomic(link);
@@ -588,6 +547,9 @@ static void init_zspage(struct page *first_page, struct size_class *class)
 	}
 }
 
+/*
+ * Allocate a zspage for the given size class
+ */
 static struct page *alloc_zspage(struct size_class *class, gfp_t flags)
 {
 	int i, error;
@@ -620,7 +582,7 @@ static struct page *alloc_zspage(struct size_class *class, gfp_t flags)
 			first_page->inuse = 0;
 		}
 		if (i == 1)
-			set_page_private(first_page, (unsigned long)page);
+			first_page->private = (unsigned long)page;
 		if (i >= 1)
 			page->first_page = first_page;
 		if (i >= 2)
@@ -636,7 +598,7 @@ static struct page *alloc_zspage(struct size_class *class, gfp_t flags)
 	/* Maximum number of objects we can store in this zspage */
 	first_page->objects = class->pages_per_zspage * PAGE_SIZE / class->size;
 
-	error = 0; 
+	error = 0; /* Success */
 
 cleanup:
 	if (unlikely(error) && first_page) {
@@ -847,6 +809,9 @@ struct zs_pool *zs_create_pool(const char *name, gfp_t flags)
 	int i, ovhd_size;
 	struct zs_pool *pool;
 
+	if (!name)
+		return NULL;
+
 	ovhd_size = roundup(sizeof(*pool), PAGE_SIZE);
 	pool = kzalloc(ovhd_size, GFP_KERNEL);
 	if (!pool)
@@ -869,6 +834,7 @@ struct zs_pool *zs_create_pool(const char *name, gfp_t flags)
 	}
 
 	pool->flags = flags;
+	pool->name = name;
 
 	return pool;
 }
@@ -884,7 +850,8 @@ void zs_destroy_pool(struct zs_pool *pool)
 
 		for (fg = 0; fg < _ZS_NR_FULLNESS_GROUPS; fg++) {
 			if (class->fullness_list[fg]) {
-				pr_info("Freeing non-empty class with size %db, fullness group %d\n",
+				pr_info("Freeing non-empty class with size "
+					"%db, fullness group %d\n",
 					class->size, fg);
 			}
 		}
@@ -944,7 +911,7 @@ unsigned long zs_malloc(struct zs_pool *pool, size_t size)
 	kunmap_atomic(link);
 
 	first_page->inuse++;
-	
+	/* Now move the zspage to another fullness group, if required */
 	fix_fullness_group(pool, first_page);
 	spin_unlock(&class->lock);
 
@@ -974,7 +941,7 @@ void zs_free(struct zs_pool *pool, unsigned long obj)
 
 	spin_lock(&class->lock);
 
-	
+	/* Insert this object in containing zspage's freelist */
 	link = (struct link_free *)((unsigned char *)kmap_atomic(f_page)
 							+ f_offset);
 	link->next = first_page->freelist;
@@ -1037,7 +1004,7 @@ void *zs_map_object(struct zs_pool *pool, unsigned long handle,
 	area = &get_cpu_var(zs_map_area);
 	area->vm_mm = mm;
 	if (off + class->size <= PAGE_SIZE) {
-		
+		/* this object is contained entirely within a page */
 		area->vm_addr = kmap_atomic(page);
 		return area->vm_addr + off;
 	}

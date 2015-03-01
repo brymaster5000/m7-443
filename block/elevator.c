@@ -547,27 +547,6 @@ int elv_reinsert_request(struct request_queue *q, struct request *rq)
 	return res;
 }
 
-int elv_reinsert_request(struct request_queue *q, struct request *rq)
-{
-	int res;
-
-	if (!q->elevator->type->ops.elevator_reinsert_req_fn)
-		return -EPERM;
-
-	res = q->elevator->type->ops.elevator_reinsert_req_fn(q, rq);
-	if (!res) {
-		if (blk_account_rq(rq)) {
-			q->in_flight[rq_is_sync(rq)]--;
-			if (rq->cmd_flags & REQ_SORTED)
-				elv_deactivate_rq(q, rq);
-		}
-		rq->cmd_flags &= ~REQ_STARTED;
-		q->nr_sorted++;
-	}
-
-	return res;
-}
-
 void elv_drain_elevator(struct request_queue *q)
 {
 	static int printed;
